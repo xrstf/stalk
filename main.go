@@ -9,7 +9,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/pmezard/go-difflib/difflib"
+	"github.com/gookit/color"
+	"github.com/shibukawa/cdiff"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/pflag"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -27,6 +28,12 @@ import (
 	"k8s.io/client-go/restmapper"
 	"k8s.io/client-go/tools/clientcmd"
 	"sigs.k8s.io/yaml"
+)
+
+var (
+	createColorTheme map[cdiff.Tag]color.Style
+	updateColorTheme map[cdiff.Tag]color.Style
+	deleteColorTheme map[cdiff.Tag]color.Style
 )
 
 /*
@@ -73,7 +80,27 @@ func (rc *resourceCache) objectKey(obj *unstructured.Unstructured) string {
 	return fmt.Sprintf("%s/%s", obj.GetNamespace(), obj.GetName())
 }
 
+func cloneColorTheme(theme map[cdiff.Tag]color.Style) map[cdiff.Tag]color.Style {
+	result := map[cdiff.Tag]color.Style{}
+
+	for k, v := range theme {
+		result[k] = v
+	}
+
+	return result
+}
+
 func main() {
+	// init color schemes
+	updateColorTheme = cloneColorTheme(cdiff.GooKitColorTheme)
+	updateColorTheme[cdiff.OpenHeader] = color.New(color.Yellow)
+
+	createColorTheme = cloneColorTheme(updateColorTheme)
+	createColorTheme[cdiff.OpenInsertedModified] = nil
+
+	deleteColorTheme = cloneColorTheme(updateColorTheme)
+	deleteColorTheme[cdiff.OpenDeletedModified] = nil
+
 	rootCtx := context.Background()
 
 	opt := options{
@@ -206,49 +233,72 @@ func watcher(ctx context.Context, w watch.Interface, hideManagedFields bool) {
 			metaObject.SetManagedFields(nil)
 		}
 
-		key := metaObject.GetName()
-		if ns := metaObject.GetNamespace(); ns != "" {
-			key = fmt.Sprintf("%s/%s", ns, key)
-		}
-
 		switch event.Type {
 		case watch.Added:
-			encoded, _ := yaml.Marshal(event.Object)
-			fmt.Printf("--- CREATE --- %s ---------------------------------------------\n", key)
-			fmt.Printf("%s\n\n", strings.TrimSpace(string(encoded)))
+			printObjectDiff(nil, metaObject)
+			fmt.Printf("\n")
+
 			cache.Set(metaObject)
 
 		case watch.Modified:
-			previousObject := cache.Get(metaObject)
+			printObjectDiff(cache.Get(metaObject), metaObject)
+			fmt.Printf("\n")
+
 			cache.Set(metaObject)
 
-			fmt.Printf("--- UPDATE --- %s ---------------------------------------------\n", key)
-			fmt.Printf("%s\n\n", strings.TrimSpace(diffObjects(previousObject, metaObject)))
-
 		case watch.Deleted:
+			printObjectDiff(metaObject, nil)
+			fmt.Printf("\n")
+
 			cache.Delete(metaObject)
-			// encoded, _ := yaml.Marshal(event.Object)
-			fmt.Printf("--- DELETE --- %s ---------------------------------------------\n", key)
-			// fmt.Printf("%s\n\n", strings.TrimSpace(string(encoded)))
 		}
 	}
 }
 
-func diffObjects(a, b *unstructured.Unstructured) string {
-	encodedA, _ := yaml.Marshal(a)
-	encodedB, _ := yaml.Marshal(b)
-
-	diff := difflib.UnifiedDiff{
-		A:        difflib.SplitLines(string(encodedA)),
-		B:        difflib.SplitLines(string(encodedB)),
-		FromFile: "Previous",
-		ToFile:   "Current",
-		Context:  3,
+func objectKey(obj *unstructured.Unstructured) string {
+	key := obj.GetName()
+	if ns := obj.GetNamespace(); ns != "" {
+		key = fmt.Sprintf("%s/%s", ns, key)
 	}
 
-	diffStr, _ := difflib.GetUnifiedDiffString(diff)
+	return key
+}
 
-	return diffStr
+func diffTitle(obj *unstructured.Unstructured) string {
+	if obj == nil {
+		return "(none)"
+	}
+
+	return fmt.Sprintf("%s %s v%s (gen. %d)", obj.GroupVersionKind().Kind, objectKey(obj), obj.GetResourceVersion(), obj.GetGeneration())
+}
+
+func yamlEncode(obj *unstructured.Unstructured) string {
+	if obj == nil {
+		return ""
+	}
+
+	encoded, _ := yaml.Marshal(obj)
+
+	return string(encoded)
+}
+
+func printObjectDiff(a, b *unstructured.Unstructured) {
+	encodedA := yamlEncode(a)
+	encodedB := yamlEncode(b)
+
+	titleA := diffTitle(a)
+	titleB := diffTitle(b)
+
+	colorTheme := updateColorTheme
+	if a == nil {
+		colorTheme = createColorTheme
+	}
+	if b == nil {
+		colorTheme = deleteColorTheme
+	}
+
+	diff := cdiff.Diff(encodedA, encodedB, cdiff.WordByWord)
+	color.Print(diff.UnifiedWithGooKitColor(titleA, titleB, 3, colorTheme))
 }
 
 func getRESTMapper(config *rest.Config, log logrus.FieldLogger) (meta.RESTMapper, error) {
