@@ -9,16 +9,14 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gookit/color"
-	"github.com/shibukawa/cdiff"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/pflag"
+	"go.xrstf.de/stalk/pkg/diff"
+	"go.xrstf.de/stalk/pkg/watcher"
 	"k8s.io/apimachinery/pkg/api/meta"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/discovery"
 	memory "k8s.io/client-go/discovery/cached"
 	"k8s.io/client-go/discovery/cached/disk"
@@ -27,80 +25,20 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/restmapper"
 	"k8s.io/client-go/tools/clientcmd"
-	"sigs.k8s.io/yaml"
 )
-
-var (
-	createColorTheme map[cdiff.Tag]color.Style
-	updateColorTheme map[cdiff.Tag]color.Style
-	deleteColorTheme map[cdiff.Tag]color.Style
-)
-
-/*
-	stalk -n kubermatic deployments,pods [-l "field=value"] [NAME, ...]
-*/
 
 type options struct {
 	kubeconfig        string
 	namespace         string
 	labels            string
 	hideManagedFields bool
+	hidePaths         []string
+	showPaths         []string
 	selector          labels.Selector
 	verbose           bool
 }
 
-type resourceCache struct {
-	resources map[string]*unstructured.Unstructured
-}
-
-func newResourceCache() *resourceCache {
-	return &resourceCache{
-		resources: map[string]*unstructured.Unstructured{},
-	}
-}
-
-func (rc *resourceCache) Get(obj *unstructured.Unstructured) *unstructured.Unstructured {
-	existing, exists := rc.resources[rc.objectKey(obj)]
-	if !exists {
-		return nil
-	}
-
-	return existing.DeepCopy()
-}
-
-func (rc *resourceCache) Set(obj *unstructured.Unstructured) {
-	rc.resources[rc.objectKey(obj)] = obj.DeepCopy()
-}
-
-func (rc *resourceCache) Delete(obj *unstructured.Unstructured) {
-	delete(rc.resources, rc.objectKey(obj))
-}
-
-func (rc *resourceCache) objectKey(obj *unstructured.Unstructured) string {
-	return fmt.Sprintf("%s/%s", obj.GetNamespace(), obj.GetName())
-}
-
-func cloneColorTheme(theme map[cdiff.Tag]color.Style) map[cdiff.Tag]color.Style {
-	result := map[cdiff.Tag]color.Style{}
-
-	for k, v := range theme {
-		result[k] = v
-	}
-
-	return result
-}
-
 func main() {
-	// init color schemes
-	updateColorTheme = cloneColorTheme(cdiff.GooKitColorTheme)
-	updateColorTheme[cdiff.OpenHeader] = color.New(color.Yellow)
-
-	createColorTheme = cloneColorTheme(updateColorTheme)
-	createColorTheme[cdiff.OpenInsertedModified] = nil
-
-	deleteColorTheme = cloneColorTheme(updateColorTheme)
-	deleteColorTheme[cdiff.OpenDeletedModified] = nil
-
 	rootCtx := context.Background()
 
 	opt := options{
@@ -112,6 +50,8 @@ func main() {
 	pflag.StringVarP(&opt.namespace, "namespace", "n", opt.namespace, "Kubernetes namespace to watch resources in")
 	pflag.StringVarP(&opt.labels, "labels", "l", opt.labels, "Label-selector as an alternative to specifying resource names")
 	pflag.BoolVar(&opt.hideManagedFields, "hide-managed", opt.hideManagedFields, "Do not show managed fields")
+	pflag.StringArrayVarP(&opt.showPaths, "show", "s", opt.showPaths, "path expression to include in output (can be given multiple times)")
+	pflag.StringArrayVarP(&opt.hidePaths, "hide", "h", opt.hidePaths, "path expression to hide in output (can be given multiple times)")
 	pflag.BoolVarP(&opt.verbose, "verbose", "v", opt.verbose, "Enable more verbose output")
 	pflag.Parse()
 
@@ -127,6 +67,19 @@ func main() {
 	}
 
 	// validate CLI flags
+	differOpts := &diff.Options{
+		ContextLines:     3,
+		ExcludePaths:     opt.hidePaths,
+		IncludePaths:     opt.showPaths,
+		CreateColorTheme: diff.CreateColorTheme,
+		UpdateColorTheme: diff.UpdateColorTheme,
+		DeleteColorTheme: diff.DeleteColorTheme,
+	}
+
+	if opt.hideManagedFields {
+		differOpts.ExcludePaths = append(differOpts.ExcludePaths, "metadata.managedFields")
+	}
+
 	if opt.kubeconfig == "" {
 		opt.kubeconfig = os.Getenv("KUBECONFIG")
 	}
@@ -196,6 +149,11 @@ func main() {
 	// setup watches for each kind
 	log.Debug("Starting to watch resources...")
 
+	differ, err := diff.NewDiffer(differOpts, log)
+	if err != nil {
+		log.Fatalf("Failed to create differ: %w", err)
+	}
+
 	wg := sync.WaitGroup{}
 	for _, gvk := range kinds {
 		dynamicInterface, err := getDynamicInterface(gvk, opt.namespace, dynamicClient, mapper)
@@ -212,93 +170,12 @@ func main() {
 
 		wg.Add(1)
 		go func() {
-			watcher(rootCtx, w, opt.hideManagedFields)
+			watcher.NewWatcher(differ).Watch(rootCtx, w)
 			wg.Done()
 		}()
 	}
 
 	wg.Wait()
-}
-
-func watcher(ctx context.Context, w watch.Interface, hideManagedFields bool) {
-	cache := newResourceCache()
-
-	for event := range w.ResultChan() {
-		metaObject, ok := event.Object.(*unstructured.Unstructured)
-		if !ok {
-			continue
-		}
-
-		if hideManagedFields {
-			metaObject.SetManagedFields(nil)
-		}
-
-		switch event.Type {
-		case watch.Added:
-			printObjectDiff(nil, metaObject)
-			fmt.Printf("\n")
-
-			cache.Set(metaObject)
-
-		case watch.Modified:
-			printObjectDiff(cache.Get(metaObject), metaObject)
-			fmt.Printf("\n")
-
-			cache.Set(metaObject)
-
-		case watch.Deleted:
-			printObjectDiff(metaObject, nil)
-			fmt.Printf("\n")
-
-			cache.Delete(metaObject)
-		}
-	}
-}
-
-func objectKey(obj *unstructured.Unstructured) string {
-	key := obj.GetName()
-	if ns := obj.GetNamespace(); ns != "" {
-		key = fmt.Sprintf("%s/%s", ns, key)
-	}
-
-	return key
-}
-
-func diffTitle(obj *unstructured.Unstructured) string {
-	if obj == nil {
-		return "(none)"
-	}
-
-	return fmt.Sprintf("%s %s v%s (gen. %d)", obj.GroupVersionKind().Kind, objectKey(obj), obj.GetResourceVersion(), obj.GetGeneration())
-}
-
-func yamlEncode(obj *unstructured.Unstructured) string {
-	if obj == nil {
-		return ""
-	}
-
-	encoded, _ := yaml.Marshal(obj)
-
-	return string(encoded)
-}
-
-func printObjectDiff(a, b *unstructured.Unstructured) {
-	encodedA := yamlEncode(a)
-	encodedB := yamlEncode(b)
-
-	titleA := diffTitle(a)
-	titleB := diffTitle(b)
-
-	colorTheme := updateColorTheme
-	if a == nil {
-		colorTheme = createColorTheme
-	}
-	if b == nil {
-		colorTheme = deleteColorTheme
-	}
-
-	diff := cdiff.Diff(encodedA, encodedB, cdiff.WordByWord)
-	color.Print(diff.UnifiedWithGooKitColor(titleA, titleB, 3, colorTheme))
 }
 
 func getRESTMapper(config *rest.Config, log logrus.FieldLogger) (meta.RESTMapper, error) {
