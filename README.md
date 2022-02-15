@@ -82,7 +82,9 @@ stalk -n kube-system deployments --jsonpath "{.metadata.name}"
 ```
 
 JSONPaths are also supported, but only a single one can be given and it's always
-applied first (before `--show` and `--hide`).
+applied first (before `--show` and `--hide`). If your JSONPath results in a scalar
+value (like `{.metadata.name}`), the `--show` and `--hide` rules are not applied
+anymore.
 
 ## License
 

@@ -9,10 +9,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/sirupsen/logrus"
-	"github.com/spf13/pflag"
 	"go.xrstf.de/stalk/pkg/diff"
 	"go.xrstf.de/stalk/pkg/watcher"
+
+	"github.com/sirupsen/logrus"
+	"github.com/spf13/pflag"
 	"k8s.io/apimachinery/pkg/api/meta"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -186,7 +187,7 @@ func main() {
 
 		wg.Add(1)
 		go func() {
-			watcher.NewWatcher(differ, resourceNames).Watch(rootCtx, w)
+			watcher.NewWatcher(differ, log, resourceNames).Watch(rootCtx, w)
 			wg.Done()
 		}()
 	}

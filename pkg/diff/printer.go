@@ -7,10 +7,11 @@ import (
 	"strings"
 	"time"
 
+	"go.xrstf.de/stalk/pkg/maputil"
+
 	"github.com/gookit/color"
 	"github.com/shibukawa/cdiff"
 	"github.com/sirupsen/logrus"
-	"go.xrstf.de/stalk/pkg/maputil"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/json"
 	"sigs.k8s.io/yaml"
@@ -94,8 +95,22 @@ func (d *Differ) preprocess(obj *unstructured.Unstructured) (string, error) {
 				return "", fmt.Errorf("failed to encode JSON path result as JSON: %w", err)
 			}
 
+			// reset the map
+			genericObj = map[string]interface{}{}
+
 			if err := json.Unmarshal(generic, &genericObj); err != nil {
-				return "", fmt.Errorf("failed to re-decode JSON path result from JSON: %w", err)
+				// the JSONPath might have resulted in a scalar value
+				var testValue interface{}
+				if innerErr := json.Unmarshal(generic, &testValue); innerErr != nil {
+					return "", fmt.Errorf("failed to re-decode JSON path result from JSON: %w", err)
+				}
+
+				final, err := yaml.JSONToYAML(generic)
+				if err != nil {
+					return "", fmt.Errorf("failed to encode object as YAML: %w", err)
+				}
+
+				return string(final), nil
 			}
 		}
 	}

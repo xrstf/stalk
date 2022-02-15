@@ -6,19 +6,23 @@ import (
 
 	"go.xrstf.de/stalk/pkg/cache"
 	"go.xrstf.de/stalk/pkg/diff"
+
+	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/watch"
 )
 
 type Watcher struct {
 	differ        *diff.Differ
+	log           logrus.FieldLogger
 	resourceNames []string
 	cache         *cache.ResourceCache
 }
 
-func NewWatcher(differ *diff.Differ, resourceNames []string) *Watcher {
+func NewWatcher(differ *diff.Differ, log logrus.FieldLogger, resourceNames []string) *Watcher {
 	return &Watcher{
 		differ:        differ,
+		log:           log,
 		resourceNames: resourceNames,
 		cache:         cache.NewCache(),
 	}
@@ -47,16 +51,22 @@ func (w *Watcher) Watch(ctx context.Context, wi watch.Interface) {
 
 		switch event.Type {
 		case watch.Added:
-			w.differ.PrintDiff(nil, obj, time.Time{})
+			if err := w.differ.PrintDiff(nil, obj, time.Time{}); err != nil {
+				w.log.Errorf("Failed to show diff: %w", err)
+			}
 			w.cache.Set(obj)
 
 		case watch.Modified:
 			previous, lastSeen := w.cache.Get(obj)
-			w.differ.PrintDiff(previous, obj, lastSeen)
+			if err := w.differ.PrintDiff(previous, obj, lastSeen); err != nil {
+				w.log.Errorf("Failed to show diff: %w", err)
+			}
 			w.cache.Set(obj)
 
 		case watch.Deleted:
-			w.differ.PrintDiff(obj, nil, time.Now())
+			if err := w.differ.PrintDiff(obj, nil, time.Now()); err != nil {
+				w.log.Errorf("Failed to show diff: %w", err)
+			}
 			w.cache.Delete(obj)
 		}
 	}
