@@ -20,6 +20,7 @@ Usage of ./stalk:
   -l, --labels string       Label-selector as an alternative to specifying resource names
   -n, --namespace string    Kubernetes namespace to watch resources in (default "default")
   -s, --show stringArray    path expression to include in output (can be given multiple times) (applied before the --hide paths)
+  -e, --show-empty          do not hide changes which would produce no diff because of --hide/--show/--jsonpath
   -v, --verbose             Enable more verbose output
 ```
 
