@@ -3,6 +3,26 @@
 `stalk` is a command line tool to watch a given set of resources and
 print the diffs for every change.
 
+## Installation
+
+```bash
+go get go.xrstf.de/stalk
+```
+
+## Usage
+
+```
+Usage of ./stalk:
+  -h, --hide stringArray    path expression to hide in output (can be given multiple times)
+      --hide-managed        Do not show managed fields (default true)
+  -j, --jsonpath string     JSON path expression to transform the output (applied before the --show paths)
+      --kubeconfig string   kubeconfig file to use (uses $KUBECONFIG by default)
+  -l, --labels string       Label-selector as an alternative to specifying resource names
+  -n, --namespace string    Kubernetes namespace to watch resources in (default "default")
+  -s, --show stringArray    path expression to include in output (can be given multiple times) (applied before the --hide paths)
+  -v, --verbose             Enable more verbose output
+```
+
 ## Examples
 
 ```bash
@@ -62,26 +82,6 @@ stalk -n kube-system deployments --jsonpath "{.metadata.name}"
 
 JSONPaths are also supported, but only a single one can be given and it's always
 applied first (before `--show` and `--hide`).
-
-## Installation
-
-```bash
-go get go.xrstf.de/stalk
-```
-
-## Usage
-
-```
-Usage of ./stalk:
-  -h, --hide stringArray    path expression to hide in output (can be given multiple times)
-      --hide-managed        Do not show managed fields (default true)
-  -j, --jsonpath string     JSON path expression to transform the output (applied before the --show paths)
-      --kubeconfig string   kubeconfig file to use (uses $KUBECONFIG by default)
-  -l, --labels string       Label-selector as an alternative to specifying resource names
-  -n, --namespace string    Kubernetes namespace to watch resources in (default "default")
-  -s, --show stringArray    path expression to include in output (can be given multiple times) (applied before the --hide paths)
-  -v, --verbose             Enable more verbose output
-```
 
 ## License
 
