@@ -2,7 +2,6 @@ package watcher
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"go.xrstf.de/stalk/pkg/cache"
@@ -48,22 +47,17 @@ func (w *Watcher) Watch(ctx context.Context, wi watch.Interface) {
 
 		switch event.Type {
 		case watch.Added:
-			w.printDiff(nil, obj, time.Time{})
+			w.differ.PrintDiff(nil, obj, time.Time{})
 			w.cache.Set(obj)
 
 		case watch.Modified:
 			previous, lastSeen := w.cache.Get(obj)
-			w.printDiff(previous, obj, lastSeen)
+			w.differ.PrintDiff(previous, obj, lastSeen)
 			w.cache.Set(obj)
 
 		case watch.Deleted:
-			w.printDiff(obj, nil, time.Now())
+			w.differ.PrintDiff(obj, nil, time.Now())
 			w.cache.Delete(obj)
 		}
 	}
-}
-
-func (w *Watcher) printDiff(oldObj, newObj *unstructured.Unstructured, lastSeen time.Time) {
-	w.differ.PrintDiff(oldObj, newObj, lastSeen)
-	fmt.Printf("\n")
 }

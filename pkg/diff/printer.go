@@ -1,7 +1,10 @@
 package diff
 
 import (
+	"bytes"
 	"fmt"
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/gookit/color"
@@ -57,7 +60,11 @@ func (d *Differ) PrintDiff(oldObj, newObj *unstructured.Unstructured, lastSeen t
 	}
 
 	diff := cdiff.Diff(oldString, newString, cdiff.WordByWord)
-	color.Print(diff.UnifiedWithGooKitColor(titleA, titleB, d.opt.ContextLines, colorTheme))
+
+	var buf bytes.Buffer
+	color.Fprint(&buf, diff.UnifiedWithGooKitColor(titleA, titleB, d.opt.ContextLines, colorTheme))
+
+	fmt.Println(fixBadSection(buf.String(), colorTheme))
 
 	return nil
 }
@@ -147,12 +154,13 @@ func diffTitle(obj *unstructured.Unstructured, lastSeen time.Time) string {
 	return fmt.Sprintf("%s %s v%s (%s) (gen. %d)", kind, objectKey(obj), timestamp, obj.GetResourceVersion(), obj.GetGeneration())
 }
 
-func yamlEncode(obj *unstructured.Unstructured) string {
-	if obj == nil {
-		return ""
-	}
+// this ensures that the first line of a context/diff is not placed in the
+// same line as the @@...@@ marker
+func fixBadSection(output string, theme map[cdiff.Tag]color.Style) string {
+	regex := theme[cdiff.OpenSection].Render("@@ _placeholder_ @@")
+	regex = regexp.QuoteMeta(regex)
+	regex = strings.Replace(regex, "_placeholder_", "[0-9-+, ]+", -1)
+	expr := regexp.MustCompile(regex)
 
-	encoded, _ := yaml.Marshal(obj)
-
-	return string(encoded)
+	return expr.ReplaceAllString(output, `$0`+"\n")
 }
