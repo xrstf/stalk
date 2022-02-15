@@ -36,6 +36,7 @@ type options struct {
 	hidePaths         []string
 	showPaths         []string
 	selector          labels.Selector
+	showEmpty         bool
 	verbose           bool
 }
 
@@ -45,6 +46,7 @@ func main() {
 	opt := options{
 		namespace:         "default",
 		hideManagedFields: true,
+		showEmpty:         false,
 	}
 
 	pflag.StringVar(&opt.kubeconfig, "kubeconfig", opt.kubeconfig, "kubeconfig file to use (uses $KUBECONFIG by default)")
@@ -54,6 +56,7 @@ func main() {
 	pflag.StringVarP(&opt.jsonPath, "jsonpath", "j", opt.jsonPath, "JSON path expression to transform the output (applied before the --show paths)")
 	pflag.StringArrayVarP(&opt.showPaths, "show", "s", opt.showPaths, "path expression to include in output (can be given multiple times) (applied before the --hide paths)")
 	pflag.StringArrayVarP(&opt.hidePaths, "hide", "h", opt.hidePaths, "path expression to hide in output (can be given multiple times)")
+	pflag.BoolVarP(&opt.showEmpty, "show-empty", "e", opt.showEmpty, "do not hide changes which would produce no diff because of --hide/--show/--jsonpath")
 	pflag.BoolVarP(&opt.verbose, "verbose", "v", opt.verbose, "Enable more verbose output")
 	pflag.Parse()
 
@@ -73,6 +76,7 @@ func main() {
 		ContextLines:     3,
 		ExcludePaths:     opt.hidePaths,
 		IncludePaths:     opt.showPaths,
+		HideEmptyDiffs:   !opt.showEmpty,
 		CreateColorTheme: diff.CreateColorTheme,
 		UpdateColorTheme: diff.UpdateColorTheme,
 		DeleteColorTheme: diff.DeleteColorTheme,

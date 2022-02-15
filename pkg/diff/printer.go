@@ -40,6 +40,11 @@ func (d *Differ) PrintDiff(oldObj, newObj *unstructured.Unstructured, lastSeen t
 		return fmt.Errorf("failed to process current object: %w", err)
 	}
 
+	// this can happen if the spec changes, but `--show metadata` was given by the user
+	if oldString == newString && d.opt.HideEmptyDiffs {
+		return nil
+	}
+
 	titleA := diffTitle(oldObj, lastSeen)
 	titleB := diffTitle(newObj, time.Now())
 
