@@ -77,9 +77,15 @@ func main() {
 		ExcludePaths:     opt.hidePaths,
 		IncludePaths:     opt.showPaths,
 		HideEmptyDiffs:   !opt.showEmpty,
+		JSONPath:         opt.jsonPath,
 		CreateColorTheme: diff.CreateColorTheme,
 		UpdateColorTheme: diff.UpdateColorTheme,
 		DeleteColorTheme: diff.DeleteColorTheme,
+	}
+
+	// when a subset of resources is requsted, no context is required in the diff
+	if len(differOpts.IncludePaths) > 0 || opt.jsonPath != "" {
+		differOpts.ContextLines = 0
 	}
 
 	if opt.hideManagedFields {
