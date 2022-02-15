@@ -40,10 +40,10 @@ func (w *Watcher) Watch(ctx context.Context, wi watch.Interface) {
 					break
 				}
 			}
-		}
 
-		if !include {
-			continue
+			if !include {
+				continue
+			}
 		}
 
 		switch event.Type {
