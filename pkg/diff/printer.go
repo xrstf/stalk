@@ -88,9 +88,17 @@ func (d *Differ) preprocess(obj *unstructured.Unstructured) (string, error) {
 		}
 	}
 
-	// for _, includePath := range d.opt.parsedIncludePaths {
+	if len(d.opt.parsedIncludePaths) > 0 {
+		genericObj, err = maputil.PruneObject(genericObj, d.opt.parsedIncludePaths)
+		if err != nil {
+			return "", fmt.Errorf("failed to apply include inpressions: %w", err)
+		}
 
-	// }
+		generic, err = json.Marshal(genericObj)
+		if err != nil {
+			return "", fmt.Errorf("failed to encode include inpression result as JSON: %w", err)
+		}
+	}
 
 	if len(d.opt.parsedExcludePaths) > 0 {
 		for _, excludePath := range d.opt.parsedExcludePaths {

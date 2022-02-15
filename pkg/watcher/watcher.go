@@ -12,14 +12,16 @@ import (
 )
 
 type Watcher struct {
-	differ *diff.Differ
-	cache  *cache.ResourceCache
+	differ        *diff.Differ
+	resourceNames []string
+	cache         *cache.ResourceCache
 }
 
-func NewWatcher(differ *diff.Differ) *Watcher {
+func NewWatcher(differ *diff.Differ, resourceNames []string) *Watcher {
 	return &Watcher{
-		differ: differ,
-		cache:  cache.NewCache(),
+		differ:        differ,
+		resourceNames: resourceNames,
+		cache:         cache.NewCache(),
 	}
 }
 
@@ -30,9 +32,19 @@ func (w *Watcher) Watch(ctx context.Context, wi watch.Interface) {
 			continue
 		}
 
-		// if hideManagedFields {
-		// 	metaObject.SetManagedFields(nil)
-		// }
+		include := false
+		if len(w.resourceNames) > 0 {
+			for _, wantedName := range w.resourceNames {
+				if wantedName == obj.GetName() {
+					include = true
+					break
+				}
+			}
+		}
+
+		if !include {
+			continue
+		}
 
 		switch event.Type {
 		case watch.Added:

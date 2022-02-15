@@ -32,6 +32,7 @@ type options struct {
 	namespace         string
 	labels            string
 	hideManagedFields bool
+	jsonPath          string
 	hidePaths         []string
 	showPaths         []string
 	selector          labels.Selector
@@ -50,7 +51,8 @@ func main() {
 	pflag.StringVarP(&opt.namespace, "namespace", "n", opt.namespace, "Kubernetes namespace to watch resources in")
 	pflag.StringVarP(&opt.labels, "labels", "l", opt.labels, "Label-selector as an alternative to specifying resource names")
 	pflag.BoolVar(&opt.hideManagedFields, "hide-managed", opt.hideManagedFields, "Do not show managed fields")
-	pflag.StringArrayVarP(&opt.showPaths, "show", "s", opt.showPaths, "path expression to include in output (can be given multiple times)")
+	pflag.StringVarP(&opt.jsonPath, "jsonpath", "j", opt.jsonPath, "JSON path expression to transform the output (applied before the --show paths)")
+	pflag.StringArrayVarP(&opt.showPaths, "show", "s", opt.showPaths, "path expression to include in output (can be given multiple times) (applied before the --hide paths)")
 	pflag.StringArrayVarP(&opt.hidePaths, "hide", "h", opt.hidePaths, "path expression to hide in output (can be given multiple times)")
 	pflag.BoolVarP(&opt.verbose, "verbose", "v", opt.verbose, "Enable more verbose output")
 	pflag.Parse()
@@ -78,6 +80,10 @@ func main() {
 
 	if opt.hideManagedFields {
 		differOpts.ExcludePaths = append(differOpts.ExcludePaths, "metadata.managedFields")
+	}
+
+	if err := differOpts.Validate(); err != nil {
+		log.Fatalf("Invalid CLI options: %v", err)
 	}
 
 	if opt.kubeconfig == "" {
@@ -170,7 +176,7 @@ func main() {
 
 		wg.Add(1)
 		go func() {
-			watcher.NewWatcher(differ).Watch(rootCtx, w)
+			watcher.NewWatcher(differ, resourceNames).Watch(rootCtx, w)
 			wg.Done()
 		}()
 	}
