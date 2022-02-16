@@ -3,6 +3,10 @@
 `stalk` is a command line tool to watch a given set of resources and
 print the diffs for every change.
 
+<p align="center">
+  <img src="docs/diff.png" />
+</p>
+
 ## Installation
 
 ```bash
