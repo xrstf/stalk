@@ -31,3 +31,10 @@ func cloneColorTheme(theme map[cdiff.Tag]color.Style) map[cdiff.Tag]color.Style 
 
 	return result
 }
+
+func disableWordDiff(theme map[cdiff.Tag]color.Style) map[cdiff.Tag]color.Style {
+	theme[cdiff.OpenDeletedModified] = theme[cdiff.OpenDeletedNotModified]
+	theme[cdiff.OpenInsertedModified] = theme[cdiff.OpenInsertedNotModified]
+
+	return theme
+}

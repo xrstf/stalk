@@ -38,6 +38,7 @@ type options struct {
 	showPaths         []string
 	selector          labels.Selector
 	showEmpty         bool
+	disableWordDiff   bool
 	contextLines      int
 	verbose           bool
 }
@@ -49,6 +50,7 @@ func main() {
 		namespace:         "default",
 		hideManagedFields: true,
 		showEmpty:         false,
+		disableWordDiff:   false,
 		contextLines:      3,
 	}
 
@@ -60,6 +62,7 @@ func main() {
 	pflag.StringArrayVarP(&opt.showPaths, "show", "s", opt.showPaths, "path expression to include in output (can be given multiple times) (applied before the --hide paths)")
 	pflag.StringArrayVarP(&opt.hidePaths, "hide", "h", opt.hidePaths, "path expression to hide in output (can be given multiple times)")
 	pflag.BoolVarP(&opt.showEmpty, "show-empty", "e", opt.showEmpty, "do not hide changes which would produce no diff because of --hide/--show/--jsonpath")
+	pflag.BoolVarP(&opt.disableWordDiff, "diff-by-line", "w", opt.disableWordDiff, "diff entire lines and do not highlight changes within words")
 	pflag.IntVarP(&opt.contextLines, "context-lines", "c", opt.contextLines, "number of context lines to show in diffs")
 	pflag.BoolVarP(&opt.verbose, "verbose", "v", opt.verbose, "Enable more verbose output")
 	pflag.Parse()
@@ -78,6 +81,7 @@ func main() {
 	// validate CLI flags
 	differOpts := &diff.Options{
 		ContextLines:     opt.contextLines,
+		DisableWordDiff:  true,
 		ExcludePaths:     opt.hidePaths,
 		IncludePaths:     opt.showPaths,
 		HideEmptyDiffs:   !opt.showEmpty,

@@ -12,8 +12,9 @@ import (
 )
 
 type Options struct {
-	ContextLines   int
-	HideEmptyDiffs bool
+	ContextLines    int
+	HideEmptyDiffs  bool
+	DisableWordDiff bool
 
 	JSONPath         string
 	compiledJSONPath *jsonpath.JSONPath

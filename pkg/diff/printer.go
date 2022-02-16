@@ -27,6 +27,12 @@ func NewDiffer(opt *Options, log logrus.FieldLogger) (*Differ, error) {
 		return nil, fmt.Errorf("invalid options: %w", err)
 	}
 
+	if opt.DisableWordDiff {
+		opt.CreateColorTheme = disableWordDiff(cloneColorTheme(opt.CreateColorTheme))
+		opt.UpdateColorTheme = disableWordDiff(cloneColorTheme(opt.UpdateColorTheme))
+		opt.DeleteColorTheme = disableWordDiff(cloneColorTheme(opt.DeleteColorTheme))
+	}
+
 	return &Differ{
 		opt: opt,
 		log: log,
@@ -166,7 +172,7 @@ func diffTitle(obj *unstructured.Unstructured, lastSeen time.Time) string {
 	timestamp := lastSeen.Format(time.RFC3339)
 	kind := obj.GroupVersionKind().Kind
 
-	return fmt.Sprintf("%s %s v%s (%s) (gen. %d)", kind, objectKey(obj), timestamp, obj.GetResourceVersion(), obj.GetGeneration())
+	return fmt.Sprintf("%s %s v%s (%s) (gen. %d)", kind, objectKey(obj), obj.GetResourceVersion(), timestamp, obj.GetGeneration())
 }
 
 // this ensures that the first line of a context/diff is not placed in the

@@ -14,6 +14,7 @@ go get go.xrstf.de/stalk
 ```
 Usage of ./stalk:
   -c, --context-lines int   number of context lines to show in diffs (default 3)
+  -w, --diff-by-line        diff entire lines and do not highlight changes within words
   -h, --hide stringArray    path expression to hide in output (can be given multiple times)
       --hide-managed        Do not show managed fields (default true)
   -j, --jsonpath string     JSON path expression to transform the output (applied before the --show paths)
