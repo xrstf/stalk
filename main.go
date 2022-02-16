@@ -38,6 +38,7 @@ type options struct {
 	showPaths         []string
 	selector          labels.Selector
 	showEmpty         bool
+	contextLines      int
 	verbose           bool
 }
 
@@ -48,6 +49,7 @@ func main() {
 		namespace:         "default",
 		hideManagedFields: true,
 		showEmpty:         false,
+		contextLines:      3,
 	}
 
 	pflag.StringVar(&opt.kubeconfig, "kubeconfig", opt.kubeconfig, "kubeconfig file to use (uses $KUBECONFIG by default)")
@@ -58,6 +60,7 @@ func main() {
 	pflag.StringArrayVarP(&opt.showPaths, "show", "s", opt.showPaths, "path expression to include in output (can be given multiple times) (applied before the --hide paths)")
 	pflag.StringArrayVarP(&opt.hidePaths, "hide", "h", opt.hidePaths, "path expression to hide in output (can be given multiple times)")
 	pflag.BoolVarP(&opt.showEmpty, "show-empty", "e", opt.showEmpty, "do not hide changes which would produce no diff because of --hide/--show/--jsonpath")
+	pflag.IntVarP(&opt.contextLines, "context-lines", "c", opt.contextLines, "number of context lines to show in diffs")
 	pflag.BoolVarP(&opt.verbose, "verbose", "v", opt.verbose, "Enable more verbose output")
 	pflag.Parse()
 
@@ -74,7 +77,7 @@ func main() {
 
 	// validate CLI flags
 	differOpts := &diff.Options{
-		ContextLines:     3,
+		ContextLines:     opt.contextLines,
 		ExcludePaths:     opt.hidePaths,
 		IncludePaths:     opt.showPaths,
 		HideEmptyDiffs:   !opt.showEmpty,
@@ -82,11 +85,6 @@ func main() {
 		CreateColorTheme: diff.CreateColorTheme,
 		UpdateColorTheme: diff.UpdateColorTheme,
 		DeleteColorTheme: diff.DeleteColorTheme,
-	}
-
-	// when a subset of resources is requsted, no context is required in the diff
-	if len(differOpts.IncludePaths) > 0 || opt.jsonPath != "" {
-		differOpts.ContextLines = 0
 	}
 
 	if opt.hideManagedFields {
