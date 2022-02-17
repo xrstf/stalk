@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -16,8 +17,11 @@ import (
 	"github.com/spf13/pflag"
 	"k8s.io/apimachinery/pkg/api/meta"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	yamlutil "k8s.io/apimachinery/pkg/util/yaml"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/discovery"
 	memory "k8s.io/client-go/discovery/cached"
 	"k8s.io/client-go/discovery/cached/disk"
@@ -99,6 +103,13 @@ func main() {
 		log.Fatalf("Invalid CLI options: %v", err)
 	}
 
+	differ, err := diff.NewDiffer(differOpts, log)
+	if err != nil {
+		log.Fatalf("Failed to create differ: %w", err)
+	}
+
+	printer := diff.NewPrinter(differ, log)
+
 	if opt.kubeconfig == "" {
 		opt.kubeconfig = os.Getenv("KUBECONFIG")
 	}
@@ -108,26 +119,53 @@ func main() {
 		log.Fatal("No resource kind and name given.")
 	}
 
+	if args[0] == "-" {
+		watchStdin(rootCtx, log, os.Stdin, printer)
+	} else {
+		watchKubernetes(rootCtx, log, args, &opt, printer)
+	}
+}
+
+func watchStdin(ctx context.Context, log logrus.FieldLogger, input io.Reader, printer *diff.Printer) {
+	decoder := yamlutil.NewYAMLOrJSONDecoder(input, 1024)
+
+	for {
+		object := unstructured.Unstructured{}
+		err := decoder.Decode(&object)
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+
+			log.Errorf("Failed to decode YAML object: %v", err)
+			continue
+		}
+
+		printer.Print(&object, watch.Modified)
+	}
+}
+
+func watchKubernetes(ctx context.Context, log logrus.FieldLogger, args []string, appOpts *options, printer *diff.Printer) {
 	resourceKinds := strings.Split(strings.ToLower(args[0]), ",")
 	resourceNames := args[1:]
 
 	// is there a label selector?
-	if opt.labels != "" {
-		selector, err := labels.Parse(opt.labels)
+	if appOpts.labels != "" {
+		selector, err := labels.Parse(appOpts.labels)
 		if err != nil {
 			log.Fatalf("Invalid label selector: %v", err)
 		}
 
-		opt.selector = selector
+		appOpts.selector = selector
 	}
 
 	hasNames := len(resourceNames) > 0
-	if hasNames && opt.selector != nil {
+	if hasNames && appOpts.selector != nil {
 		log.Fatal("Cannot specify both resource names and a label selector at the same time.")
 	}
 
 	// setup kubernetes client
-	config, err := clientcmd.BuildConfigFromFlags("", opt.kubeconfig)
+	config, err := clientcmd.BuildConfigFromFlags("", appOpts.kubeconfig)
 	if err != nil {
 		log.Fatalf("Failed to create Kubernetes client: %v", err)
 	}
@@ -168,20 +206,15 @@ func main() {
 	// setup watches for each kind
 	log.Debug("Starting to watch resources...")
 
-	differ, err := diff.NewDiffer(differOpts, log)
-	if err != nil {
-		log.Fatalf("Failed to create differ: %w", err)
-	}
-
 	wg := sync.WaitGroup{}
 	for _, gvk := range kinds {
-		dynamicInterface, err := getDynamicInterface(gvk, opt.namespace, dynamicClient, mapper)
+		dynamicInterface, err := getDynamicInterface(gvk, appOpts.namespace, dynamicClient, mapper)
 		if err != nil {
 			log.Fatalf("Failed to create dynamic interface for %q resources: %v", gvk.Kind, err)
 		}
 
-		w, err := dynamicInterface.Watch(rootCtx, v1.ListOptions{
-			LabelSelector: opt.labels,
+		w, err := dynamicInterface.Watch(ctx, v1.ListOptions{
+			LabelSelector: appOpts.labels,
 		})
 		if err != nil {
 			log.Fatalf("Failed to create watch for %q resources: %v", gvk.Kind, err)
@@ -189,7 +222,7 @@ func main() {
 
 		wg.Add(1)
 		go func() {
-			watcher.NewWatcher(differ, log, resourceNames).Watch(rootCtx, w)
+			watcher.NewWatcher(printer, resourceNames).Watch(ctx, w)
 			wg.Done()
 		}()
 	}

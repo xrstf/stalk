@@ -92,6 +92,15 @@ applied first (before `--show` and `--hide`). If your JSONPath results in a scal
 value (like `{.metadata.name}`), the `--show` and `--hide` rules are not applied
 anymore.
 
+```bash
+kubectl get deployments -o yaml --watch | stalk - --jsonpath "{.metadata.name}"
+```
+
+If you want, you can also pipe kubectl's output (a series of YAML documents) into
+stalk. Note that in this case filtering by label selector or resource name is not
+available, but all other formatting options work. You must use a single `-` argument
+to indicate reading from stdin.
+
 ## License
 
 MIT
