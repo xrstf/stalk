@@ -43,5 +43,5 @@ func (rc *ResourceCache) Delete(obj *unstructured.Unstructured) {
 }
 
 func (rc *ResourceCache) objectKey(obj *unstructured.Unstructured) string {
-	return fmt.Sprintf("%s/%s", obj.GetNamespace(), obj.GetName())
+	return fmt.Sprintf("%s/%s/%s", obj.GroupVersionKind().String(), obj.GetNamespace(), obj.GetName())
 }
