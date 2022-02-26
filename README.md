@@ -10,7 +10,7 @@ print the diffs for every change.
 ## Installation
 
 ```bash
-go get go.xrstf.de/stalk
+go install go.xrstf.de/stalk
 ```
 
 ## Usage
