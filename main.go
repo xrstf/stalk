@@ -16,7 +16,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/pflag"
 	"k8s.io/apimachinery/pkg/api/meta"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -213,7 +213,7 @@ func watchKubernetes(ctx context.Context, log logrus.FieldLogger, args []string,
 			log.Fatalf("Failed to create dynamic interface for %q resources: %v", gvk.Kind, err)
 		}
 
-		w, err := dynamicInterface.Watch(ctx, v1.ListOptions{
+		w, err := dynamicInterface.Watch(ctx, metav1.ListOptions{
 			LabelSelector: appOpts.labels,
 		})
 		if err != nil {
