@@ -9,6 +9,9 @@ print the diffs for every change.
 
 ## Installation
 
+You can download a binary for the [latest release on GitHub](https://github.com/xrstf/stalk/releases)
+or install stalk via Go:
+
 ```bash
 go install go.xrstf.de/stalk
 ```
