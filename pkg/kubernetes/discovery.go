@@ -70,24 +70,13 @@ func computeDiscoverCacheDir(parentDir, host string) string {
 	return filepath.Join(parentDir, safeHost)
 }
 
-func GetDynamicInterface(gvk schema.GroupVersionKind, namespace string, dynamicClient dynamic.Interface, mapper meta.RESTMapper) (dynamic.ResourceInterface, error) {
+func GetDynamicInterface(gvk schema.GroupVersionKind, dynamicClient dynamic.Interface, mapper meta.RESTMapper) (dynamic.ResourceInterface, error) {
 	mapping, err := mapper.RESTMapping(gvk.GroupKind(), gvk.Version)
 	if err != nil {
 		return nil, fmt.Errorf("failed to determine mapping: %w", err)
 	}
 
-	namespaced := mapping.Scope.Name() == meta.RESTScopeNameNamespace
-
-	var dr dynamic.ResourceInterface
-	if namespaced {
-		// namespaced resources should specify the namespace
-		dr = dynamicClient.Resource(mapping.Resource).Namespace(namespace)
-	} else {
-		// for cluster-wide resources
-		dr = dynamicClient.Resource(mapping.Resource)
-	}
-
-	return dr, nil
+	return dynamicClient.Resource(mapping.Resource), nil
 }
 
 func MappingFor(restMapper meta.RESTMapper, cache discovery.CachedDiscoveryInterface, resourceOrKindArg string) (*meta.RESTMapping, error) {

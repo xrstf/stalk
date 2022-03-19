@@ -28,7 +28,7 @@ import (
 
 type options struct {
 	kubeconfig        string
-	namespace         string
+	namespaces        []string
 	labels            string
 	hideManagedFields bool
 	jsonPath          string
@@ -45,7 +45,6 @@ func main() {
 	rootCtx := context.Background()
 
 	opt := options{
-		namespace:         "default",
 		hideManagedFields: true,
 		showEmpty:         false,
 		disableWordDiff:   false,
@@ -53,7 +52,7 @@ func main() {
 	}
 
 	pflag.StringVar(&opt.kubeconfig, "kubeconfig", opt.kubeconfig, "kubeconfig file to use (uses $KUBECONFIG by default)")
-	pflag.StringVarP(&opt.namespace, "namespace", "n", opt.namespace, "Kubernetes namespace to watch resources in")
+	pflag.StringArrayVarP(&opt.namespaces, "namespace", "n", opt.namespaces, "Kubernetes namespace to watch resources in (supports glob expression) (can be given multiple times)")
 	pflag.StringVarP(&opt.labels, "labels", "l", opt.labels, "Label-selector as an alternative to specifying resource names")
 	pflag.BoolVar(&opt.hideManagedFields, "hide-managed", opt.hideManagedFields, "Do not show managed fields")
 	pflag.StringVarP(&opt.jsonPath, "jsonpath", "j", opt.jsonPath, "JSON path expression to transform the output (applied before the --show paths)")
@@ -209,7 +208,7 @@ func watchKubernetes(ctx context.Context, log logrus.FieldLogger, args []string,
 
 	wg := sync.WaitGroup{}
 	for _, gvk := range kinds {
-		dynamicInterface, err := kubeutil.GetDynamicInterface(gvk, appOpts.namespace, dynamicClient, mapper)
+		dynamicInterface, err := kubeutil.GetDynamicInterface(gvk, dynamicClient, mapper)
 		if err != nil {
 			log.Fatalf("Failed to create dynamic interface for %q resources: %v", gvk.Kind, err)
 		}
@@ -223,7 +222,7 @@ func watchKubernetes(ctx context.Context, log logrus.FieldLogger, args []string,
 
 		wg.Add(1)
 		go func() {
-			watcher.NewWatcher(printer, resourceNames).Watch(ctx, w)
+			watcher.NewWatcher(printer, appOpts.namespaces, resourceNames).Watch(ctx, w)
 			wg.Done()
 		}()
 	}

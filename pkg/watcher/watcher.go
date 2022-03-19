@@ -2,6 +2,8 @@ package watcher
 
 import (
 	"context"
+	"path/filepath"
+	"strings"
 
 	"go.xrstf.de/stalk/pkg/diff"
 
@@ -11,12 +13,14 @@ import (
 
 type Watcher struct {
 	printer       *diff.Printer
+	namespaces    []string
 	resourceNames []string
 }
 
-func NewWatcher(printer *diff.Printer, resourceNames []string) *Watcher {
+func NewWatcher(printer *diff.Printer, namespaces, resourceNames []string) *Watcher {
 	return &Watcher{
 		printer:       printer,
+		namespaces:    namespaces,
 		resourceNames: resourceNames,
 	}
 }
@@ -28,20 +32,47 @@ func (w *Watcher) Watch(ctx context.Context, wi watch.Interface) {
 			continue
 		}
 
-		include := false
-		if len(w.resourceNames) > 0 {
-			for _, wantedName := range w.resourceNames {
-				if wantedName == obj.GetName() {
-					include = true
-					break
-				}
-			}
-
-			if !include {
-				continue
-			}
+		if w.resourceNameMatches(obj) && w.resourceNamespaceMatches(obj) {
+			w.printer.Print(obj, event.Type)
 		}
-
-		w.printer.Print(obj, event.Type)
 	}
+}
+
+func (w *Watcher) resourceNameMatches(obj *unstructured.Unstructured) bool {
+	// no names given, so all resources match
+	if len(w.resourceNames) == 0 {
+		return true
+	}
+
+	for _, wantedName := range w.resourceNames {
+		if nameMatches(obj.GetName(), wantedName) {
+			return true
+		}
+	}
+
+	return false
+}
+
+func (w *Watcher) resourceNamespaceMatches(obj *unstructured.Unstructured) bool {
+	// no namespaces given, so all resources match
+	if len(w.namespaces) == 0 {
+		return true
+	}
+
+	for _, wantedNamespace := range w.namespaces {
+		if nameMatches(obj.GetNamespace(), wantedNamespace) {
+			return true
+		}
+	}
+
+	return false
+}
+
+func nameMatches(name string, pattern string) bool {
+	if strings.Contains(pattern, "*") {
+		matched, _ := filepath.Match(pattern, name)
+		return matched
+	}
+
+	return name == pattern
 }
