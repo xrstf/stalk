@@ -5,30 +5,24 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 	"strings"
 	"sync"
 	"time"
 
 	"go.xrstf.de/stalk/pkg/diff"
+	kubeutil "go.xrstf.de/stalk/pkg/kubernetes"
 	"go.xrstf.de/stalk/pkg/watcher"
 
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/pflag"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	yamlutil "k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/discovery"
-	memory "k8s.io/client-go/discovery/cached"
-	"k8s.io/client-go/discovery/cached/disk"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
-	"k8s.io/client-go/restmapper"
 	"k8s.io/client-go/tools/clientcmd"
 )
 
@@ -178,7 +172,7 @@ func watchKubernetes(ctx context.Context, log logrus.FieldLogger, args []string,
 
 	log.Debug("Creating REST mapper...")
 
-	mapper, err := getRESTMapper(config, log)
+	mapper, cache, err := kubeutil.CreateRESTMapper(config, log)
 	if err != nil {
 		log.Fatalf("Failed to create Kubernetes REST mapper: %v", err)
 	}
@@ -195,7 +189,7 @@ func watchKubernetes(ctx context.Context, log logrus.FieldLogger, args []string,
 	for _, resourceKind := range resourceKinds {
 		log.Debugf("Resolving %s...", resourceKind)
 
-		parsed, err := mappingFor(mapper, resourceKind)
+		parsed, err := kubeutil.MappingFor(mapper, cache, resourceKind)
 		if err != nil {
 			log.Fatalf("Unknown resource kind %q: %v", resourceKind, err)
 		}
@@ -215,7 +209,7 @@ func watchKubernetes(ctx context.Context, log logrus.FieldLogger, args []string,
 
 	wg := sync.WaitGroup{}
 	for _, gvk := range kinds {
-		dynamicInterface, err := getDynamicInterface(gvk, appOpts.namespace, dynamicClient, mapper)
+		dynamicInterface, err := kubeutil.GetDynamicInterface(gvk, appOpts.namespace, dynamicClient, mapper)
 		if err != nil {
 			log.Fatalf("Failed to create dynamic interface for %q resources: %v", gvk.Kind, err)
 		}
@@ -235,95 +229,4 @@ func watchKubernetes(ctx context.Context, log logrus.FieldLogger, args []string,
 	}
 
 	wg.Wait()
-}
-
-func getRESTMapper(config *rest.Config, log logrus.FieldLogger) (meta.RESTMapper, error) {
-	var discoveryClient discovery.DiscoveryInterface
-
-	home, err := os.UserHomeDir()
-	if err != nil {
-		log.Warn("Cannot determine home directory, will disable discovery cache.")
-
-		discoveryClient, err = discovery.NewDiscoveryClientForConfig(config)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		cacheDir := filepath.Join(home, ".kube", "cache")
-
-		discoveryClient, err = disk.NewCachedDiscoveryClientForConfig(config, cacheDir, cacheDir, 10*time.Minute)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	cache := memory.NewMemCacheClient(discoveryClient)
-	mapper := restmapper.NewDeferredDiscoveryRESTMapper(cache)
-	fancyMapper := restmapper.NewShortcutExpander(mapper, discoveryClient)
-
-	return fancyMapper, nil
-}
-
-func getDynamicInterface(gvk schema.GroupVersionKind, namespace string, dynamicClient dynamic.Interface, mapper meta.RESTMapper) (dynamic.ResourceInterface, error) {
-	mapping, err := mapper.RESTMapping(gvk.GroupKind(), gvk.Version)
-	if err != nil {
-		return nil, fmt.Errorf("failed to determine mapping: %w", err)
-	}
-
-	namespaced := mapping.Scope.Name() == meta.RESTScopeNameNamespace
-
-	var dr dynamic.ResourceInterface
-	if namespaced {
-		// namespaced resources should specify the namespace
-		dr = dynamicClient.Resource(mapping.Resource).Namespace(namespace)
-	} else {
-		// for cluster-wide resources
-		dr = dynamicClient.Resource(mapping.Resource)
-	}
-
-	return dr, nil
-}
-
-// mappingFor is copied straight from kubectl:
-// https://github.com/kubernetes/kubernetes/blob/0b8d725f5a04178caf09cd802305c4b8370db65e/staging/src/k8s.io/cli-runtime/pkg/resource/builder.go
-func mappingFor(restMapper meta.RESTMapper, resourceOrKindArg string) (*meta.RESTMapping, error) {
-	fullySpecifiedGVR, groupResource := schema.ParseResourceArg(resourceOrKindArg)
-	gvk := schema.GroupVersionKind{}
-
-	if fullySpecifiedGVR != nil {
-		gvk, _ = restMapper.KindFor(*fullySpecifiedGVR)
-	}
-	if gvk.Empty() {
-		gvk, _ = restMapper.KindFor(groupResource.WithVersion(""))
-	}
-	if !gvk.Empty() {
-		return restMapper.RESTMapping(gvk.GroupKind(), gvk.Version)
-	}
-
-	fullySpecifiedGVK, groupKind := schema.ParseKindArg(resourceOrKindArg)
-	if fullySpecifiedGVK == nil {
-		gvk := groupKind.WithVersion("")
-		fullySpecifiedGVK = &gvk
-	}
-
-	if !fullySpecifiedGVK.Empty() {
-		if mapping, err := restMapper.RESTMapping(fullySpecifiedGVK.GroupKind(), fullySpecifiedGVK.Version); err == nil {
-			return mapping, nil
-		}
-	}
-
-	mapping, err := restMapper.RESTMapping(groupKind, gvk.Version)
-	if err != nil {
-		// if we error out here, it is because we could not match a resource or a kind
-		// for the given argument. To maintain consistency with previous behavior,
-		// announce that a resource type could not be found.
-		// if the error is _not_ a *meta.NoKindMatchError, then we had trouble doing discovery,
-		// so we should return the original error since it may help a user diagnose what is actually wrong
-		if meta.IsNoMatchError(err) {
-			return nil, fmt.Errorf("the server doesn't have a resource type %q", groupResource.Resource)
-		}
-		return nil, err
-	}
-
-	return mapping, nil
 }
