@@ -19,7 +19,14 @@ import (
 	"k8s.io/client-go/restmapper"
 )
 
-func CreateRESTMapper(config *rest.Config, log logrus.FieldLogger) (meta.RESTMapper, discovery.CachedDiscoveryInterface, error) {
+type Resolver struct {
+	mapper        meta.RESTMapper
+	dynamicClient dynamic.Interface
+	cache         discovery.CachedDiscoveryInterface
+	log           logrus.FieldLogger
+}
+
+func NewResolver(config *rest.Config, log logrus.FieldLogger) (*Resolver, error) {
 	var (
 		discoveryClient discovery.DiscoveryInterface
 		cache           discovery.CachedDiscoveryInterface
@@ -31,7 +38,7 @@ func CreateRESTMapper(config *rest.Config, log logrus.FieldLogger) (meta.RESTMap
 
 		discoveryClient, err = discovery.NewDiscoveryClientForConfig(config)
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 
 		cache = memory.NewMemCacheClient(discoveryClient)
@@ -43,7 +50,7 @@ func CreateRESTMapper(config *rest.Config, log logrus.FieldLogger) (meta.RESTMap
 
 		client, err := disk.NewCachedDiscoveryClientForConfig(config, discoveryCacheDir, httpCacheDir, 6*time.Hour)
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 
 		discoveryClient = client
@@ -53,7 +60,17 @@ func CreateRESTMapper(config *rest.Config, log logrus.FieldLogger) (meta.RESTMap
 	mapper := restmapper.NewDeferredDiscoveryRESTMapper(cache)
 	fancyMapper := restmapper.NewShortcutExpander(mapper, discoveryClient)
 
-	return fancyMapper, cache, nil
+	dynamicClient, err := dynamic.NewForConfig(config)
+	if err != nil {
+		log.Fatalf("Failed to create dynamic Kubernetes client: %v", err)
+	}
+
+	return &Resolver{
+		mapper:        fancyMapper,
+		dynamicClient: dynamicClient,
+		cache:         cache,
+		log:           log,
+	}, nil
 }
 
 // overlyCautiousIllegalFileCharacters matches characters that *might* not be supported.  Windows is really restrictive, so this is really restrictive
@@ -70,26 +87,39 @@ func computeDiscoverCacheDir(parentDir, host string) string {
 	return filepath.Join(parentDir, safeHost)
 }
 
-func GetDynamicInterface(gvk schema.GroupVersionKind, dynamicClient dynamic.Interface, mapper meta.RESTMapper) (dynamic.ResourceInterface, error) {
-	mapping, err := mapper.RESTMapping(gvk.GroupKind(), gvk.Version)
+func (r *Resolver) ResourceInterfaceFor(gvk schema.GroupVersionKind) (dynamic.ResourceInterface, error) {
+	mapping, err := r.mapper.RESTMapping(gvk.GroupKind(), gvk.Version)
 	if err != nil {
 		return nil, fmt.Errorf("failed to determine mapping: %w", err)
 	}
 
-	return dynamicClient.Resource(mapping.Resource), nil
+	return r.dynamicClient.Resource(mapping.Resource), nil
 }
 
-func MappingFor(restMapper meta.RESTMapper, cache discovery.CachedDiscoveryInterface, resourceOrKindArg string) (*meta.RESTMapping, error) {
-	mapping, err := mappingFor(restMapper, resourceOrKindArg)
+func (r *Resolver) InvalidateCache() {
+	r.cache.Invalidate()
+}
+
+func (r *Resolver) ResolveWithoutRetry(resourceOrKindArg string) (*meta.RESTMapping, error) {
+	mapping, err := mappingFor(r.mapper, resourceOrKindArg)
 	if meta.IsNoMatchError(err) {
-		cache.Invalidate()
+		return nil, nil
+	}
+
+	return mapping, err
+}
+
+func (r *Resolver) Resolve(resourceOrKindArg string) (*meta.RESTMapping, error) {
+	mapping, err := mappingFor(r.mapper, resourceOrKindArg)
+	if meta.IsNoMatchError(err) {
+		r.cache.Invalidate()
 
 		// try again
-		mapping, err = mappingFor(restMapper, resourceOrKindArg)
+		mapping, err = mappingFor(r.mapper, resourceOrKindArg)
 	}
 
 	if meta.IsNoMatchError(err) {
-		return nil, fmt.Errorf("the server doesn't have a resource type %q", resourceOrKindArg)
+		return nil, nil
 	}
 
 	return mapping, err

@@ -21,7 +21,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	yamlutil "k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 )
@@ -169,16 +168,9 @@ func watchKubernetes(ctx context.Context, log logrus.FieldLogger, args []string,
 		fmt.Println(clientset)
 	}
 
-	log.Debug("Creating REST mapper...")
-
-	mapper, cache, err := kubeutil.CreateRESTMapper(config, log)
+	resolver, err := kubeutil.NewResolver(config, log)
 	if err != nil {
 		log.Fatalf("Failed to create Kubernetes REST mapper: %v", err)
-	}
-
-	dynamicClient, err := dynamic.NewForConfig(config)
-	if err != nil {
-		log.Fatalf("Failed to create dynamic Kubernetes client: %v", err)
 	}
 
 	// validate resource kinds
@@ -188,7 +180,7 @@ func watchKubernetes(ctx context.Context, log logrus.FieldLogger, args []string,
 	for _, resourceKind := range resourceKinds {
 		log.Debugf("Resolving %s...", resourceKind)
 
-		parsed, err := kubeutil.MappingFor(mapper, cache, resourceKind)
+		parsed, err := resolver.Resolve(resourceKind)
 		if err != nil {
 			log.Fatalf("Unknown resource kind %q: %v", resourceKind, err)
 		}
@@ -207,13 +199,15 @@ func watchKubernetes(ctx context.Context, log logrus.FieldLogger, args []string,
 	log.Debug("Starting to watch resources...")
 
 	wg := sync.WaitGroup{}
+	w := watcher.NewWatcher(printer, appOpts.namespaces, resourceNames)
+
 	for _, gvk := range kinds {
-		dynamicInterface, err := kubeutil.GetDynamicInterface(gvk, dynamicClient, mapper)
+		dynamicInterface, err := resolver.ResourceInterfaceFor(gvk)
 		if err != nil {
 			log.Fatalf("Failed to create dynamic interface for %q resources: %v", gvk.Kind, err)
 		}
 
-		w, err := dynamicInterface.Watch(ctx, metav1.ListOptions{
+		wi, err := dynamicInterface.Watch(ctx, metav1.ListOptions{
 			LabelSelector: appOpts.labels,
 		})
 		if err != nil {
@@ -222,7 +216,7 @@ func watchKubernetes(ctx context.Context, log logrus.FieldLogger, args []string,
 
 		wg.Add(1)
 		go func() {
-			watcher.NewWatcher(printer, appOpts.namespaces, resourceNames).Watch(ctx, w)
+			w.Watch(ctx, wi)
 			wg.Done()
 		}()
 	}
