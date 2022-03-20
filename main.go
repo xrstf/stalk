@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"os"
 	"strings"
@@ -21,7 +20,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	yamlutil "k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 )
 
@@ -160,12 +158,6 @@ func watchKubernetes(ctx context.Context, log logrus.FieldLogger, args []string,
 	config, err := clientcmd.BuildConfigFromFlags("", appOpts.kubeconfig)
 	if err != nil {
 		log.Fatalf("Failed to create Kubernetes client: %v", err)
-	}
-
-	clientset, err := kubernetes.NewForConfig(config)
-	if err != nil {
-		log.Fatalf("Failed to create Kubernetes clientset: %v", err)
-		fmt.Println(clientset)
 	}
 
 	resolver, err := kubeutil.NewResolver(config, log)
