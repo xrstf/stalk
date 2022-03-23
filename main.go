@@ -176,6 +176,9 @@ func watchKubernetes(ctx context.Context, log logrus.FieldLogger, args []string,
 		if err != nil {
 			log.Fatalf("Unknown resource kind %q: %v", resourceKind, err)
 		}
+		if parsed == nil {
+			log.Fatalf("Unknown resource kind %q", resourceKind)
+		}
 
 		gvk := parsed.GroupVersionKind
 		kinds[gvk.String()] = gvk
