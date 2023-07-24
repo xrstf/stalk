@@ -121,7 +121,7 @@ func main() {
 
 	differ, err := diff.NewDiffer(differOpts, log)
 	if err != nil {
-		log.Fatalf("Failed to create differ: %w", err)
+		log.Fatalf("Failed to create differ: %v", err)
 	}
 
 	printer := diff.NewPrinter(differ, log)
