@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2023 Christoph Mewes
+// SPDX-License-Identifier: MIT
+
 package maputil
 
 import "k8s.io/apimachinery/pkg/util/json"
