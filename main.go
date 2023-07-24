@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"os"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -24,6 +26,22 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 )
 
+// Project build specific vars
+var (
+	Tag    string
+	Commit string
+)
+
+func printVersion() {
+	fmt.Printf(
+		"version: %s\nbuilt with: %s\ntag: %s\ncommit: %s\n",
+		strings.TrimPrefix(Tag, "v"),
+		runtime.Version(),
+		Tag,
+		Commit,
+	)
+}
+
 type options struct {
 	kubeconfig        string
 	namespaces        []string
@@ -37,6 +55,7 @@ type options struct {
 	disableWordDiff   bool
 	contextLines      int
 	verbose           bool
+	version           bool
 }
 
 func main() {
@@ -49,18 +68,24 @@ func main() {
 		contextLines:      3,
 	}
 
-	pflag.StringVar(&opt.kubeconfig, "kubeconfig", opt.kubeconfig, "kubeconfig file to use (uses $KUBECONFIG by default)")
+	pflag.StringVar(&opt.kubeconfig, "kubeconfig", opt.kubeconfig, "Kubeconfig file to use (uses $KUBECONFIG by default)")
 	pflag.StringArrayVarP(&opt.namespaces, "namespace", "n", opt.namespaces, "Kubernetes namespace to watch resources in (supports glob expression) (can be given multiple times)")
 	pflag.StringVarP(&opt.labels, "labels", "l", opt.labels, "Label-selector as an alternative to specifying resource names")
 	pflag.BoolVar(&opt.hideManagedFields, "hide-managed", opt.hideManagedFields, "Do not show managed fields")
 	pflag.StringVarP(&opt.jsonPath, "jsonpath", "j", opt.jsonPath, "JSON path expression to transform the output (applied before the --show paths)")
-	pflag.StringArrayVarP(&opt.showPaths, "show", "s", opt.showPaths, "path expression to include in output (can be given multiple times) (applied before the --hide paths)")
-	pflag.StringArrayVarP(&opt.hidePaths, "hide", "h", opt.hidePaths, "path expression to hide in output (can be given multiple times)")
-	pflag.BoolVarP(&opt.showEmpty, "show-empty", "e", opt.showEmpty, "do not hide changes which would produce no diff because of --hide/--show/--jsonpath")
-	pflag.BoolVarP(&opt.disableWordDiff, "diff-by-line", "w", opt.disableWordDiff, "diff entire lines and do not highlight changes within words")
-	pflag.IntVarP(&opt.contextLines, "context-lines", "c", opt.contextLines, "number of context lines to show in diffs")
+	pflag.StringArrayVarP(&opt.showPaths, "show", "s", opt.showPaths, "Path expression to include in output (can be given multiple times) (applied before the --hide paths)")
+	pflag.StringArrayVarP(&opt.hidePaths, "hide", "h", opt.hidePaths, "Path expression to hide in output (can be given multiple times)")
+	pflag.BoolVarP(&opt.showEmpty, "show-empty", "e", opt.showEmpty, "Do not hide changes which would produce no diff because of --hide/--show/--jsonpath")
+	pflag.BoolVarP(&opt.disableWordDiff, "diff-by-line", "w", opt.disableWordDiff, "Compare entire lines and do not highlight changes within words")
+	pflag.IntVarP(&opt.contextLines, "context-lines", "c", opt.contextLines, "Number of context lines to show in diffs")
 	pflag.BoolVarP(&opt.verbose, "verbose", "v", opt.verbose, "Enable more verbose output")
+	pflag.BoolVarP(&opt.version, "version", "V", opt.version, "Show version info and exit immediately")
 	pflag.Parse()
+
+	if opt.version {
+		printVersion()
+		return
+	}
 
 	// setup logging
 	var log = logrus.New()

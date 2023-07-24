@@ -20,17 +20,18 @@ go install go.xrstf.de/stalk
 
 ```
 Usage of ./stalk:
-  -c, --context-lines int       number of context lines to show in diffs (default 3)
-  -w, --diff-by-line            diff entire lines and do not highlight changes within words
-  -h, --hide stringArray        path expression to hide in output (can be given multiple times)
+  -c, --context-lines int       Number of context lines to show in diffs (default 3)
+  -w, --diff-by-line            Compare entire lines and do not highlight changes within words
+  -h, --hide stringArray        Path expression to hide in output (can be given multiple times)
       --hide-managed            Do not show managed fields (default true)
   -j, --jsonpath string         JSON path expression to transform the output (applied before the --show paths)
-      --kubeconfig string       kubeconfig file to use (uses $KUBECONFIG by default)
+      --kubeconfig string       Kubeconfig file to use (uses $KUBECONFIG by default)
   -l, --labels string           Label-selector as an alternative to specifying resource names
   -n, --namespace stringArray   Kubernetes namespace to watch resources in (supports glob expression) (can be given multiple times)
-  -s, --show stringArray        path expression to include in output (can be given multiple times) (applied before the --hide paths)
-  -e, --show-empty              do not hide changes which would produce no diff because of --hide/--show/--jsonpath
+  -s, --show stringArray        Path expression to include in output (can be given multiple times) (applied before the --hide paths)
+  -e, --show-empty              Do not hide changes which would produce no diff because of --hide/--show/--jsonpath
   -v, --verbose                 Enable more verbose output
+  -V, --version                 Show version info and exit immediately
 ```
 
 ## Examples
