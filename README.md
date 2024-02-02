@@ -13,7 +13,7 @@ You can download a binary for the [latest release on GitHub](https://github.com/
 or install stalk via Go:
 
 ```bash
-go install go.xrstf.de/stalk
+go install go.xrstf.de/stalk@latest
 ```
 
 ## Usage
@@ -57,7 +57,7 @@ stalk -n kube-system deployments,statefulsets,configmaps,clusterroles
 You can include Cluster-wide resources.
 
 ```bash
-stalk -n kube-system deployments --selector "key=value"
+stalk -n kube-system deployments --labels "key=value"
 ```
 
 A label selector can be given. It will be applied to all given resource kinds.
