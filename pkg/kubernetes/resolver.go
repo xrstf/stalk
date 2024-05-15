@@ -62,7 +62,7 @@ func NewResolver(config *rest.Config, log logrus.FieldLogger) (*Resolver, error)
 	}
 
 	mapper := restmapper.NewDeferredDiscoveryRESTMapper(cache)
-	fancyMapper := restmapper.NewShortcutExpander(mapper, discoveryClient)
+	fancyMapper := restmapper.NewShortcutExpander(mapper, discoveryClient, nil)
 
 	dynamicClient, err := dynamic.NewForConfig(config)
 	if err != nil {
