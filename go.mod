@@ -1,6 +1,6 @@
 module go.xrstf.de/stalk
 
-go 1.18
+go 1.22.0
 
 require (
 	github.com/gookit/color v1.5.4
