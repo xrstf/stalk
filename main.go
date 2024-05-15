@@ -147,13 +147,13 @@ func main() {
 	}
 
 	if args[0] == "-" {
-		watchStdin(rootCtx, log, os.Stdin, printer)
+		watchStdin(log, os.Stdin, printer)
 	} else {
 		watchKubernetes(rootCtx, log, args, &opt, printer)
 	}
 }
 
-func watchStdin(ctx context.Context, log logrus.FieldLogger, input io.Reader, printer *diff.Printer) {
+func watchStdin(log logrus.FieldLogger, input io.Reader, printer *diff.Printer) {
 	decoder := yamlutil.NewYAMLOrJSONDecoder(input, 1024)
 
 	for {
@@ -213,10 +213,13 @@ func watchKubernetes(ctx context.Context, log logrus.FieldLogger, args []string,
 		if err != nil {
 			log.Fatalf("Unknown resource kind %q: %v", resourceKind, err)
 		}
+
+		//nolint:staticcheck
 		if parsed == nil {
 			log.Fatalf("Unknown resource kind %q", resourceKind)
 		}
 
+		//nolint:staticcheck
 		gvk := parsed.GroupVersionKind
 		kinds[gvk.String()] = gvk
 
