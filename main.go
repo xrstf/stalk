@@ -13,12 +13,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/sirupsen/logrus"
+	"github.com/spf13/pflag"
+
 	"go.xrstf.de/stalk/pkg/diff"
 	kubeutil "go.xrstf.de/stalk/pkg/kubernetes"
 	"go.xrstf.de/stalk/pkg/watcher"
 
-	"github.com/sirupsen/logrus"
-	"github.com/spf13/pflag"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"

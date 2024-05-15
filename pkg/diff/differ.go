@@ -10,11 +10,12 @@ import (
 	"strings"
 	"time"
 
-	"go.xrstf.de/stalk/pkg/maputil"
-
 	"github.com/gookit/color"
 	"github.com/shibukawa/cdiff"
 	"github.com/sirupsen/logrus"
+
+	"go.xrstf.de/stalk/pkg/maputil"
+
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/json"
 	"sigs.k8s.io/yaml"

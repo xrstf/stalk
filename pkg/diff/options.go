@@ -7,10 +7,11 @@ import (
 	"errors"
 	"fmt"
 
-	"go.xrstf.de/stalk/pkg/maputil"
-
 	"github.com/gookit/color"
 	"github.com/shibukawa/cdiff"
+
+	"go.xrstf.de/stalk/pkg/maputil"
+
 	"k8s.io/client-go/util/jsonpath"
 )
 

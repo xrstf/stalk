@@ -6,9 +6,10 @@ package diff
 import (
 	"time"
 
+	"github.com/sirupsen/logrus"
+
 	"go.xrstf.de/stalk/pkg/cache"
 
-	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/watch"
 )
