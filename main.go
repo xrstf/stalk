@@ -29,20 +29,27 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 )
 
-// Project build specific vars
+// These variables get set by ldflags during compilation.
 var (
-	Tag    string
-	Commit string
+	BuildTag    string
+	BuildCommit string
+	BuildDate   string // RFC3339 format ("2006-01-02T15:04:05Z07:00")
 )
 
 func printVersion() {
-	fmt.Printf(
-		"version: %s\nbuilt with: %s\ntag: %s\ncommit: %s\n",
-		strings.TrimPrefix(Tag, "v"),
-		runtime.Version(),
-		Tag,
-		Commit,
-	)
+	// handle empty values in case `go install` was used
+	if BuildCommit == "" {
+		fmt.Printf("stalk dev, built with %s\n",
+			runtime.Version(),
+		)
+	} else {
+		fmt.Printf("stalk %s (%s), built with %s on %s\n",
+			BuildTag,
+			BuildCommit[:10],
+			runtime.Version(),
+			BuildDate,
+		)
+	}
 }
 
 type options struct {

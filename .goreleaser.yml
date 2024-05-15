@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2024 Christoph Mewes
+# SPDX-License-Identifier: MIT
+
 builds:
   - env:
       # goreleaser does not work with CGO, it could also complicate
@@ -8,29 +11,34 @@ builds:
     flags:
       - -trimpath
     ldflags:
-      - '-s -w -X main.Tag={{.Version}} -X main.Commit={{.Commit}}'
+      - '-s -w -X main.BuildTag={{.Version}} -X main.BuildCommit={{.Commit}} -X main.BuildDate={{.Date}}'
     goos:
-      - freebsd
-      - windows
-      - linux
       - darwin
+      - freebsd
+      - linux
+      - windows
     goarch:
       - amd64
       - '386'
-      - arm
       - arm64
     ignore:
       - goos: darwin
         goarch: '386'
       - goos: freebsd
         goarch: '386'
+      - goos: windows
+        goarch: '386'
     binary: '{{ .ProjectName }}'
 archives:
-  - format: zip
+  - format: tar.gz
     name_template: '{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}'
+    wrap_in_directory: true
+    strip_binary_directory: true
+    format_overrides:
+      - goos: windows
+        format: zip
+    files:
+      - LICENSE
+      - README.md
 checksum:
-  name_template: '{{ .ProjectName }}_{{ .Version }}_SHA256SUMS'
-  algorithm: sha256
-release:
-  # If you want to manually examine the release before its live, uncomment this line:
-  # draft: true
+  disable: true
