@@ -192,7 +192,11 @@ func watchKubernetes(ctx context.Context, log logrus.FieldLogger, args []string,
 	}
 
 	// setup kubernetes client
-	config, err := clientcmd.BuildConfigFromFlags("", appOpts.kubeconfig)
+	rules := clientcmd.NewDefaultClientConfigLoadingRules()
+	rules.ExplicitPath = appOpts.kubeconfig
+
+	deferred := clientcmd.NewInteractiveDeferredLoadingClientConfig(rules, &clientcmd.ConfigOverrides{}, os.Stdin)
+	config, err := deferred.ClientConfig()
 	if err != nil {
 		log.Fatalf("Failed to create Kubernetes client: %v", err)
 	}
