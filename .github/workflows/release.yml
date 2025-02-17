@@ -24,6 +24,9 @@ jobs:
       # https://github.com/actions/checkout
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # fetch full history to allow goreleaser to generate the full changelog
+          fetch-depth: 0
 
       # https://github.com/actions/setup-go
       - name: Set up Go
