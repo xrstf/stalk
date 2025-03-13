@@ -1,4 +1,11 @@
-# Stalk - Watch your Kubernetes Resources change
+# Migration note
+
+> [!IMPORTANT]
+> `stalk` has been migrated to [codeberg.org/xrstf/stalk](https://codeberg.org/xrstf/stalk).
+
+---
+
+## Stalk - Watch your Kubernetes Resources change
 
 `stalk` is a command line tool to watch a given set of resources and
 print the diffs for every change.
@@ -7,16 +14,16 @@ print the diffs for every change.
   <img src="docs/diff.png" />
 </p>
 
-## Installation
+### Installation
 
-You can download a binary for the [latest release on GitHub](https://github.com/xrstf/stalk/releases)
+You can download a binary for the [latest release on Codeberg](https://codeberg.org/xrstf/stalk/releases)
 or install stalk via Go:
 
 ```bash
 go install go.xrstf.de/stalk@latest
 ```
 
-## Usage
+### Usage
 
 ```
 Usage of ./stalk:
@@ -34,7 +41,7 @@ Usage of ./stalk:
   -V, --version                 Show version info and exit immediately
 ```
 
-## Examples
+### Examples
 
 ```bash
 stalk -n kube-system deployments
@@ -107,6 +114,6 @@ stalk. Note that in this case filtering by label selector or resource name is no
 available, but all other formatting options work. You must use a single `-` argument
 to indicate reading from stdin.
 
-## License
+### License
 
 MIT
